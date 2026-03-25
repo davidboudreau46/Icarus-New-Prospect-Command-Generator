@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Icarus Prospect Command Generator</title>
+<style>
+:root {
+  --bg:#0a0f16; --bg-2:#101722; --panel:rgba(20,28,40,.9); --panel-2:rgba(26,36,50,.88);
+  --text:#e8edf5; --text-soft:#b1bbca; --text-dim:#7d8aa0; --border:#293549; --border-strong:#39506e;
+  --accent:#66a8ff; --accent-2:#8fc2ff; --success:#90d6a7; --warning-bg:rgba(234,183,72,.10);
+  --warning-border:rgba(234,183,72,.26); --warning-text:#e9d39a; --shadow:0 24px 80px rgba(0,0,0,.35);
+  --radius:20px; --content-max:1740px; --font-sans:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  --font-mono:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+}
+* { box-sizing:border-box; }
+html,body {
+  min-height:100%; margin:0; color:var(--text); font-family:var(--font-sans);
+  background:radial-gradient(circle at top, rgba(102,168,255,.12), transparent 28%), linear-gradient(180deg,#0a0f16 0%,#0d131c 100%);
+}
+body { min-height:100vh; padding:clamp(10px,2vw,28px); }
+.shell {
+  width:min(100%,var(--content-max)); margin:0 auto; display:grid;
+  grid-template-columns:minmax(0,1.9fr) minmax(320px,.78fr); gap:clamp(12px,1.4vw,22px); align-items:start;
+}
+.panel {
+  min-width:0; border:1px solid rgba(255,255,255,.06);
+  background:linear-gradient(180deg, rgba(20,28,40,.96), rgba(13,19,28,.98));
+  border-radius:24px; box-shadow:var(--shadow); backdrop-filter:blur(10px);
+}
+.main { padding:clamp(16px,2vw,28px); }
+.side { padding:clamp(16px,2vw,24px); display:grid; gap:14px; position:sticky; top:clamp(10px,2vw,28px); }
+.eyebrow {
+  display:inline-flex; align-items:center; gap:8px; padding:6px 10px; border-radius:999px;
+  background:rgba(102,168,255,.08); color:var(--accent-2); font-size:12px; letter-spacing:.05em; text-transform:uppercase;
+  margin-bottom:14px; border:1px solid rgba(102,168,255,.16);
+}
+h1 { margin:0 0 10px; font-size:clamp(28px,4vw,42px); line-height:1.05; letter-spacing:-.03em; }
+h2 { margin:0 0 14px; font-size:clamp(20px,2vw,28px); line-height:1.15; }
+h3 { margin:0 0 10px; font-size:clamp(16px,1.5vw,20px); color:var(--text-soft); }
+.section {
+  margin-top:16px; padding:14px; background:rgba(255,255,255,.02); border:1px solid rgba(255,255,255,.05); border-radius:var(--radius);
+}
+.section[hidden], .world-section[hidden], .tier-group[hidden], .map-btn[hidden], .chip-wrap[hidden], .world-note[hidden] { display:none !important; }
+.section-title {
+  font-size:12px; text-transform:uppercase; letter-spacing:.08em; color:var(--text-dim); margin-bottom:12px; font-weight:700;
+}
+.intro-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:14px; margin-bottom:20px; }
+.instruction-card {
+  padding:14px; border-radius:18px; background:rgba(255,255,255,.025); border:1px solid rgba(255,255,255,.05);
+}
+.steps { margin:0; padding-left:18px; color:var(--text-soft); display:grid; gap:9px; line-height:1.5; font-size:14px; }
+.toolbar { display:grid; gap:12px; margin-bottom:16px; }
+.search-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:10px; align-items:center; }
+.search-input, .field input, .field select, .template-input {
+  width:100%; min-width:0; border:1px solid var(--border); background:#0f1621; color:var(--text);
+  border-radius:14px; padding:11px 14px; font-size:14px; outline:none; transition:border-color .14s ease, box-shadow .14s ease;
+}
+.search-input::placeholder, .field input::placeholder, .template-input::placeholder { color:#738097; }
+.search-input:focus, .field input:focus, .field select:focus, .template-input:focus {
+  border-color:rgba(102,168,255,.6); box-shadow:0 0 0 3px rgba(102,168,255,.12);
+}
+.buttonish, .tiny-btn, .copy-btn, .copy-inline-btn, .toggle-all-btn, .chip {
+  appearance:none; border:1px solid rgba(102,168,255,.35); background:linear-gradient(180deg, rgba(102,168,255,.22), rgba(102,168,255,.12));
+  color:white; border-radius:12px; cursor:pointer; transition:transform .14s ease, filter .14s ease, border-color .14s ease, opacity .14s ease;
+}
+.tiny-btn, .toggle-all-btn { padding:10px 12px; font-size:12px; font-weight:700; white-space:nowrap; }
+.copy-btn { padding:10px 14px; font-size:12px; font-weight:700; white-space:nowrap; }
+.copy-inline-btn { padding:3px 8px; font-size:12px; font-weight:700; vertical-align:baseline; margin:0 2px; }
+.tiny-btn:hover, .copy-btn:hover, .copy-inline-btn:hover, .toggle-all-btn:hover, .chip:hover { transform:translateY(-1px); filter:brightness(1.08); }
+.copied {
+  border-color:rgba(144,214,167,.45)!important; background:linear-gradient(180deg, rgba(144,214,167,.24), rgba(144,214,167,.14))!important; color:#f2fff6;
+}
+.search-meta { display:flex; flex-wrap:wrap; gap:8px 14px; align-items:center; color:var(--text-dim); font-size:12px; }
+.match-count strong { color:var(--text-soft); }
+.helper, .footer-note { color:var(--text-dim); font-size:12px; line-height:1.5; }
+.world-block { display:grid; gap:10px; }
+.world-note {
+  margin-top:2px; padding:10px 12px; border-radius:14px; background:var(--warning-bg); border:1px solid var(--warning-border);
+  color:var(--warning-text); font-size:12px; line-height:1.5;
+}
+.filter-block { display:grid; gap:10px; }
+.filter-title { font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--text-dim); font-weight:800; }
+.chip-wrap { display:flex; flex-wrap:wrap; gap:8px; }
+.chip {
+  padding:7px 10px; font-size:12px; line-height:1; border-radius:999px; background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));
+  border:1px solid rgba(255,255,255,.08); color:var(--text-soft);
+}
+.chip.active {
+  border-color:rgba(102,168,255,.55); background:linear-gradient(180deg, rgba(102,168,255,.24), rgba(102,168,255,.12)); color:#fff;
+  box-shadow:0 0 0 3px rgba(102,168,255,.12);
+}
+.tier-group {
+  border:1px solid rgba(255,255,255,.05); border-radius:16px; background:rgba(255,255,255,.02); overflow:hidden;
+}
+.tier-header {
+  width:100%; display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 12px;
+  background:rgba(255,255,255,.018); border:0; color:var(--text-soft); cursor:pointer; text-align:left;
+}
+.tier-header:hover { background:rgba(255,255,255,.035); }
+.tier-left { display:inline-flex; align-items:center; gap:10px; min-width:0; flex-wrap:wrap; }
+.tier-name { font-size:12px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; }
+.tier-count { font-size:11px; color:var(--text-dim); white-space:nowrap; }
+.tier-caret { color:var(--accent-2); font-size:12px; transition:transform .18s ease; flex:0 0 auto; }
+.tier-group.collapsed .tier-caret { transform:rotate(-90deg); }
+.tier-content { display:flex; flex-wrap:wrap; gap:6px; padding:10px; border-top:1px solid rgba(255,255,255,.05); }
+.tier-group.collapsed .tier-content { display:none; }
+.map-btn {
+  appearance:none; border:1px solid var(--border); background:linear-gradient(180deg, var(--panel-2), var(--panel)); color:var(--text);
+  border-radius:12px; padding:8px 10px; cursor:pointer; transition:transform .14s ease, border-color .14s ease, background .14s ease, box-shadow .14s ease;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.03); min-width:140px; text-align:left;
+}
+.map-btn:hover { transform:translateY(-1px); border-color:var(--border-strong); background:linear-gradient(180deg, #223247, #172233); }
+.map-btn.active {
+  border-color:rgba(102,168,255,.5); background:linear-gradient(180deg, rgba(102,168,255,.24), rgba(102,168,255,.12)); color:#fff;
+  box-shadow:0 0 0 3px rgba(102,168,255,.12);
+}
+.map-btn-inner { display:grid; gap:6px; }
+.map-btn-title { font-size:12px; line-height:1.15; font-weight:700; }
+.badges { display:flex; flex-wrap:wrap; gap:5px; }
+.badge {
+  display:inline-flex; align-items:center; padding:3px 7px; border-radius:999px; font-size:10px; line-height:1;
+  border:1px solid rgba(255,255,255,.09); background:rgba(255,255,255,.05); color:var(--text-soft);
+}
+.badge.type { color:#d8e7ff; }
+.badge.tier { color:#d7f0ff; }
+.badge.status.confirmed { color:#d5f6df; border-color:rgba(144,214,167,.28); background:rgba(144,214,167,.08); }
+.badge.status.not-confirmed { color:#f1deb0; border-color:rgba(234,183,72,.28); background:rgba(234,183,72,.08); }
+.card {
+  background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.015)); border:1px solid rgba(255,255,255,.06); border-radius:20px; padding:18px;
+}
+.card h2 { margin:0 0 16px; font-size:15px; color:var(--text-soft); font-weight:600; }
+.field { display:flex; flex-direction:column; gap:8px; margin-bottom:14px; }
+.field:last-child { margin-bottom:0; }
+.field label, .output-label, .status-label {
+  font-size:12px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.06em; font-weight:700;
+}
+.inline-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; align-items:center; }
+.status { display:grid; gap:10px; }
+.status-row {
+  display:grid; gap:6px; padding:12px 14px; border-radius:14px; background:rgba(255,255,255,.025); border:1px solid rgba(255,255,255,.05);
+}
+.status-value { font-size:14px; color:var(--text); word-break:break-word; }
+.output-wrap { display:grid; gap:10px; }
+.output-box {
+  display:grid; grid-template-columns:minmax(0,1fr) auto; gap:12px; align-items:start; border:1px solid rgba(255,255,255,.06);
+  border-radius:18px; background:#0d141e; padding:14px;
+}
+.output-text {
+  margin:0; min-width:0; font-family:var(--font-mono); font-size:13px; line-height:1.5; color:#d9e6ff; word-break:break-word; white-space:pre-wrap;
+}
+.template-note { color:var(--text-dim); font-size:12px; line-height:1.45; }
+.template-vars code {
+  display:inline-block; padding:2px 6px; margin:2px 4px 0 0; border-radius:8px; background:rgba(255,255,255,.05); color:#d9e6ff; font-size:11px;
+}
+.empty { color:var(--text-dim); font-style:italic; }
+
+@media (max-width:1180px) {
+  .shell { grid-template-columns:1fr; }
+  .side { position:static; }
+}
+@media (max-width:720px) {
+  body { padding:8px; }
+  .panel { border-radius:18px; }
+  .main, .side { padding:14px; }
+  .section, .card, .instruction-card { padding:14px; }
+  .search-row, .inline-row, .output-box { grid-template-columns:1fr; }
+  .copy-btn, .tiny-btn, .toggle-all-btn { width:100%; }
+  .tier-header { padding:10px; }
+  .tier-content { padding:8px; gap:6px; }
+  .map-btn { width:100%; min-width:0; }
+}
+@media (max-width:420px) {
+  .steps { font-size:13px; }
+  .copy-inline-btn { display:inline-flex; align-items:center; justify-content:center; }
+}
+</style>
+</head>
+<body>
+<div class="shell">
+  <main class="panel main">
+    <div class="eyebrow">Loppy's Colony</div>
+    <h1>Prospect command generator</h1>
+
+    <div class="intro-grid">
+      <section class="instruction-card">
+        <h3>In this window</h3>
+        <ol class="steps">
+          <li>Pick a world or mission.</li>
+          <li>Leave Save name blank to use the template automatically, or type a custom name.</li>
+          <li>Use search and filters when the list gets too large.</li>
+        </ol>
+      </section>
+
+      <section class="instruction-card">
+        <h3>Option 1 - You are in the prospect selection window</h3>
+        <ol class="steps">
+          <li><button class="copy-inline-btn" onclick="copyInline(this, '/AdminLogin p3nis')">Copy /AdminLogin p3nis</button> then paste it in the chat and send it.</li>
+          <li><button class="copy-inline-btn" onclick="copyText('rcon-out', this)">Copy the generated command</button> then paste it in the chat and send it.</li>
+          <li>All done.</li>
+        </ol>
+      </section>
+
+      <section class="instruction-card">
+        <h3>Option 2 - A prospect is already loaded</h3>
+        <ol class="steps">
+          <li>Join the prospect.</li>
+          <li><button class="copy-inline-btn" onclick="copyInline(this, '/AdminLogin p3nis')">Copy /AdminLogin p3nis</button> then paste it in the chat and send it.</li>
+          <li><button class="copy-inline-btn" onclick="copyInline(this, '/ReturnToLobbyWhenEmpty')">Copy /ReturnToLobbyWhenEmpty</button> then paste it in the chat.</li>
+          <li>Go back to the character selection menu.</li>
+          <li>Join back the server.</li>
+          <li>Follow Option 1 instructions.</li>
+        </ol>
+      </section>
+    </div>
+
+    <h2>Choose a world or mission</h2>
+
+    <div class="toolbar section">
+      <div class="search-row">
+        <input id="search" class="search-input" type="text" placeholder="Search by mission name, internal name, world, tier, or type" />
+        <button class="tiny-btn" type="button" onclick="clearSearch()">Clear search</button>
+      </div>
+
+      <div class="filter-block">
+        <div class="filter-title">Tier filters</div>
+        <div class="chip-wrap" id="tier-filters"></div>
+      </div>
+
+      <div class="filter-block">
+        <div class="filter-title">Type filters</div>
+        <div class="chip-wrap" id="type-filters"></div>
+      </div>
+
+      <div class="search-meta">
+        <span class="match-count">Visible entries: <strong id="visible-count">0</strong></span>
+        <button class="toggle-all-btn" type="button" onclick="expandAll()">Expand all groups</button>
+        <button class="toggle-all-btn" type="button" onclick="collapseAll()">Collapse all groups</button>
+      </div>
+    </div>
+
+    <div id="world-sections"></div>
+  </main>
+
+  <aside class="panel side">
+    <div class="card">
+      <h2>Command settings</h2>
+
+      <div class="field">
+        <label for="savename">Save name</label>
+        <input type="text" id="savename" placeholder="Loppy's Colony on PICKED_PROSPECT" />
+        <div class="helper">Leave blank to generate the save name from the template below.</div>
+      </div>
+
+      <div class="field">
+        <label for="name-template">Smart name template</label>
+        <input type="text" id="name-template" class="template-input" value="Loppy's Colony on {prospect}" />
+        <div class="template-note">Used only when Save name is blank.</div>
+        <div class="template-vars">
+          <code>{prospect}</code><code>{internal}</code><code>{difficulty}</code><code>{world}</code><code>{type}</code><code>{tier}</code><code>{date}</code>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="inline-row" style="grid-template-columns:auto 1fr; gap:10px; align-items:center;">
+          <input type="checkbox" id="omit-savename" style="width:auto; margin:0;" />
+          <span>Omit custom save name from command</span>
+        </label>
+        <div class="helper">When enabled, the command ends at the hardcore flag and does not append a prospect name.</div>
+      </div>
+
+      <div class="field">
+        <label for="difficulty">Difficulty</label>
+        <select id="difficulty">
+          <option value="1">1 - Easy</option>
+          <option value="2" selected>2 - Normal</option>
+          <option value="3">3 - Hard</option>
+          <option value="4">4 - Extreme</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="card status">
+      <div class="status-row">
+        <div class="status-label">Selected prospect</div>
+        <div class="status-value" id="selected-label">None selected</div>
+      </div>
+      <div class="status-row">
+        <div class="status-label">World / tier / type</div>
+        <div class="status-value" id="selected-meta">-</div>
+      </div>
+      <div class="status-row">
+        <div class="status-label">Internal name</div>
+        <div class="inline-row">
+          <div class="status-value" id="selected-internal">-</div>
+</div>
+      </div>
+    </div>
+
+    <div class="card output-wrap">
+      <div class="output-label">Create new prospect command</div>
+      <div class="output-box">
+        <pre class="output-text" id="rcon-out"><span class="empty">Select a map above</span></pre>
+        <button class="copy-btn" onclick="copyText('rcon-out', this)">Copy</button>
+      </div>
+    </div>
+
+    <div class="footer-note">@N0body</div>
+  </aside>
+</div>
+
+<script>
+const maps = {"olympus": {"section_title": "Base game - Olympus", "notes": [], "groups": [{"title": "Open world", "entries": [{"label": "Olympus open world", "internal": "OpenWorld_Olympus", "category": "Confirmed", "tier": "Open world", "type": "Open world", "world": "Olympus"}]}, {"title": "Tier 1", "entries": [{"label": "AGRICULTURE", "internal": "Tier1_Farming", "category": "Confirmed", "tier": "T1", "type": "Farming", "world": "Olympus"}, {"label": "HOMESTEAD", "internal": "Tier1_Forest_Construction", "category": "Confirmed", "tier": "T1", "type": "Construction", "world": "Olympus"}, {"label": "FORSAKEN", "internal": "Tier1_Forest_Defence", "category": "Confirmed", "tier": "T1", "type": "Defence", "world": "Olympus"}, {"label": "ARGOS", "internal": "Tier1_Forest_Exploration_0", "category": "Confirmed", "tier": "T1", "type": "Exploration", "world": "Olympus"}, {"label": "KILL LIST", "internal": "Tier1_Forest_Extermination_0", "category": "Confirmed", "tier": "T1", "type": "Extermination", "world": "Olympus"}, {"label": "STRANGE HARVEST", "internal": "Tier1_Forest_Research_0", "category": "Confirmed", "tier": "T1", "type": "Research", "world": "Olympus"}, {"label": "LIVEWIRE", "internal": "Tier1_Forest_Scan_0", "category": "Confirmed", "tier": "T1", "type": "Scan", "world": "Olympus"}, {"label": "SUPPLY STOCKPILE", "internal": "Tier1_Forest_Stockpile", "category": "Confirmed", "tier": "T1", "type": "Stockpile", "world": "Olympus"}, {"label": "HEADSTONE", "internal": "Tier1_Forest_Survey_0", "category": "Confirmed", "tier": "T1", "type": "Survey", "world": "Olympus"}, {"label": "SPELUNKING", "internal": "Tier1_Forest_WS_Stockpile", "category": "Confirmed", "tier": "T1", "type": "Stockpile", "world": "Olympus"}]}, {"title": "Tier 2 - Canyon", "entries": [{"label": "PYRAMID", "internal": "Tier2_Canyon_Construction_0", "category": "Confirmed", "tier": "T2", "type": "Construction", "world": "Olympus"}, {"label": "DRY RUN", "internal": "Tier2_Canyon_Expedition_0", "category": "Confirmed", "tier": "T2", "type": "Expedition", "world": "Olympus"}, {"label": "SANDBLAST", "internal": "Tier2_Canyon_Exploration_0", "category": "Confirmed", "tier": "T2", "type": "Exploration", "world": "Olympus"}, {"label": "SANDY BRIDGES", "internal": "Tier2_Canyon_LongSurvey_0", "category": "Confirmed", "tier": "T2", "type": "Survey", "world": "Olympus"}, {"label": "FIELD TEST", "internal": "Tier2_Canyon_Recovery_0", "category": "Confirmed", "tier": "T2", "type": "Recovery", "world": "Olympus"}, {"label": "BIOSHOCK", "internal": "Tier2_Canyon_Research_0", "category": "Confirmed", "tier": "T2", "type": "Research", "world": "Olympus"}, {"label": "DEATH RAY", "internal": "Tier2_Canyon_Scan_0", "category": "Confirmed", "tier": "T2", "type": "Scan", "world": "Olympus"}, {"label": "SOLID METAL", "internal": "Tier2_Canyon_Stockpile", "category": "Confirmed", "tier": "T2", "type": "Stockpile", "world": "Olympus"}, {"label": "PRESERVATION", "internal": "Tier2_Canyon_Stockpile2", "category": "Confirmed", "tier": "T2", "type": "Stockpile", "world": "Olympus"}, {"label": "SPIRIT LEVEL", "internal": "Tier2_Canyon_Survey_0", "category": "Confirmed", "tier": "T2", "type": "Survey", "world": "Olympus"}]}, {"title": "Tier 2 - Glacier", "entries": [{"label": "INFLUX", "internal": "Tier2_Glacier_Construction_0", "category": "Confirmed", "tier": "T2", "type": "Construction", "world": "Olympus"}, {"label": "ICESTORM", "internal": "Tier2_Glacier_Expedition_0", "category": "Confirmed", "tier": "T2", "type": "Expedition", "world": "Olympus"}, {"label": "HIGH WIRE", "internal": "Tier2_Glacier_Exploration_0", "category": "Confirmed", "tier": "T2", "type": "Exploration", "world": "Olympus"}, {"label": "DEEP VEIN", "internal": "Tier2_Glacier_Extraction_0", "category": "Confirmed", "tier": "T2", "type": "Extraction", "world": "Olympus"}, {"label": "BROKEN ARROW", "internal": "Tier2_Glacier_Recovery_0", "category": "Confirmed", "tier": "T2", "type": "Recovery", "world": "Olympus"}, {"label": "RESURGENCE", "internal": "Tier2_Glacier_Research_0", "category": "Confirmed", "tier": "T2", "type": "Research", "world": "Olympus"}, {"label": "SEARCHLIGHT", "internal": "Tier2_Glacier_Scan_0", "category": "Confirmed", "tier": "T2", "type": "Scan", "world": "Olympus"}, {"label": "ICE LINE", "internal": "Tier2_Glacier_Survey_0", "category": "Confirmed", "tier": "T2", "type": "Survey", "world": "Olympus"}]}, {"title": "Tier 3", "entries": [{"label": "LIFE LINE", "internal": "Tier3_RiverLands_Construction", "category": "Confirmed", "tier": "T3", "type": "Construction", "world": "Olympus"}, {"label": "FIRE WALK", "internal": "Tier3_RiverLands_Delivery", "category": "Confirmed", "tier": "T3", "type": "Delivery", "world": "Olympus"}, {"label": "WATERFALL", "internal": "Tier3_RiverLands_Expedition_0", "category": "Confirmed", "tier": "T3", "type": "Expedition", "world": "Olympus"}, {"label": "EDELWEISS", "internal": "Tier3_RiverLands_Exploration_0", "category": "Confirmed", "tier": "T3", "type": "Exploration", "world": "Olympus"}, {"label": "WET WORK", "internal": "Tier3_RiverLands_Extermination_0", "category": "Confirmed", "tier": "T3", "type": "Extermination", "world": "Olympus"}, {"label": "MERIDIAN", "internal": "Tier3_RiverLands_Extraction", "category": "Confirmed", "tier": "T3", "type": "Extraction", "world": "Olympus"}, {"label": "UPLIFT", "internal": "Tier3_RiverLands_Research_0", "category": "Confirmed", "tier": "T3", "type": "Research", "world": "Olympus"}, {"label": "INCURSION", "internal": "Tier3_RiverLands_Scan_0", "category": "Confirmed", "tier": "T3", "type": "Scan", "world": "Olympus"}, {"label": "RAMP UP", "internal": "Tier3_RiverLands_Stockpile_0", "category": "Confirmed", "tier": "T3", "type": "Stockpile", "world": "Olympus"}, {"label": "BIG SHOT", "internal": "Tier3_RiverLands_Stockpile_2", "category": "Confirmed", "tier": "T3", "type": "Stockpile", "world": "Olympus"}, {"label": "CLUSTERED", "internal": "Tier3_RiverLands_Survey_0", "category": "Confirmed", "tier": "T3", "type": "Survey", "world": "Olympus"}]}, {"title": "Tier 4 - Arctic", "entries": [{"label": "AVALANCHE", "internal": "Tier4_Arctic_Expedition_0", "category": "Confirmed", "tier": "T4", "type": "Expedition", "world": "Olympus"}, {"label": "TUNDRA", "internal": "Tier4_Arctic_Exploration_0", "category": "Confirmed", "tier": "T4", "type": "Exploration", "world": "Olympus"}, {"label": "CLEAN UP", "internal": "Tier4_Arctic_Extermination_0", "category": "Confirmed", "tier": "T4", "type": "Extermination", "world": "Olympus"}, {"label": "PAYDAY", "internal": "Tier4_Arctic_Extraction_0", "category": "Confirmed", "tier": "T4", "type": "Extraction", "world": "Olympus"}, {"label": "SNOWCRASH", "internal": "Tier4_Arctic_Recovery_0", "category": "Confirmed", "tier": "T4", "type": "Recovery", "world": "Olympus"}, {"label": "SNOWBLIND", "internal": "Tier4_Arctic_Scan_0", "category": "Confirmed", "tier": "T4", "type": "Scan", "world": "Olympus"}, {"label": "ADVANCED ORDER", "internal": "Tier4_Arctic_Stockpile", "category": "Confirmed", "tier": "T4", "type": "Stockpile", "world": "Olympus"}, {"label": "STATION TO STATION", "internal": "Tier4_Arctic_Survey_0", "category": "Confirmed", "tier": "T4", "type": "Survey", "world": "Olympus"}]}, {"title": "Tier 4 - Desert", "entries": [{"label": "SANDBOX", "internal": "Tier4_Desert_Construction_0", "category": "Confirmed", "tier": "T4", "type": "Construction", "world": "Olympus"}, {"label": "EL CAMINO", "internal": "Tier4_Desert_Expedition_0", "category": "Confirmed", "tier": "T4", "type": "Expedition", "world": "Olympus"}, {"label": "PROMISED LAND", "internal": "Tier4_Desert_Exploration_0", "category": "Confirmed", "tier": "T4", "type": "Exploration", "world": "Olympus"}, {"label": "DUST UP", "internal": "Tier4_Desert_Extermination_0", "category": "Confirmed", "tier": "T4", "type": "Extermination", "world": "Olympus"}, {"label": "LOOSE ENDS", "internal": "Tier4_Desert_Extermination_2", "category": "Confirmed", "tier": "T4", "type": "Extermination", "world": "Olympus"}, {"label": "CONCEALMENT", "internal": "Tier4_Desert_Recovery", "category": "Confirmed", "tier": "T4", "type": "Recovery", "world": "Olympus"}, {"label": "NIGHTWATCH", "internal": "Tier4_Desert_Research_0", "category": "Confirmed", "tier": "T4", "type": "Research", "world": "Olympus"}, {"label": "CARAPACE", "internal": "Tier4_Desert_Research_2", "category": "Confirmed", "tier": "T4", "type": "Research", "world": "Olympus"}, {"label": "SEVEN PILLARS", "internal": "Tier4_Desert_Scan_0", "category": "Confirmed", "tier": "T4", "type": "Scan", "world": "Olympus"}, {"label": "MIGRATING SANDS", "internal": "Tier4_Desert_Survey", "category": "Confirmed", "tier": "T4", "type": "Survey", "world": "Olympus"}]}, {"title": "Tier 5", "entries": [{"label": "SPIRIT WALK", "internal": "Tier5_Omni_Exploration_0", "category": "Confirmed", "tier": "T5", "type": "Exploration", "world": "Olympus"}, {"label": "NIGHTFALL", "internal": "Tier5_Omni_Olympus", "category": "Confirmed", "tier": "T5", "type": "Omni", "world": "Olympus"}, {"label": "VOYAGER", "internal": "Tier5_Omni_Recovery", "category": "Confirmed", "tier": "T5", "type": "Recovery", "world": "Olympus"}, {"label": "UNEARTHED", "internal": "Tier5_Omni_Research", "category": "Confirmed", "tier": "T5", "type": "Research", "world": "Olympus"}, {"label": "CRYOGENIC", "internal": "Tier5_Omni_Research_2", "category": "Confirmed", "tier": "T5", "type": "Research", "world": "Olympus"}]}]}, "styx": {"section_title": "Styx DLC", "notes": [], "groups": [{"title": "Open world", "entries": [{"label": "Styx open world", "internal": "OpenWorld_Styx", "category": "Confirmed", "tier": "Open world", "type": "Open world", "world": "Styx"}]}, {"title": "Set A", "entries": [{"label": "HIGHRISE", "internal": "STYX_A_Construction", "category": "Confirmed", "tier": "Set A", "type": "Construction", "world": "Styx"}, {"label": "OMPHALOS", "internal": "STYX_A_Expedition", "category": "Confirmed", "tier": "Set A", "type": "Expedition", "world": "Styx"}, {"label": "HEADLONG", "internal": "STYX_A_Exploration", "category": "Confirmed", "tier": "Set A", "type": "Exploration", "world": "Styx"}, {"label": "HUSK", "internal": "STYX_A_Extermination", "category": "Confirmed", "tier": "Set A", "type": "Extermination", "world": "Styx"}]}, {"title": "Set B", "entries": [{"label": "MAELSTROM", "internal": "STYX_B_Expedition", "category": "Confirmed", "tier": "Set B", "type": "Expedition", "world": "Styx"}, {"label": "ADAGIO", "internal": "STYX_B_Exploration", "category": "Confirmed", "tier": "Set B", "type": "Exploration", "world": "Styx"}, {"label": "HALCYON", "internal": "STYX_B_Extermination", "category": "Confirmed", "tier": "Set B", "type": "Extermination", "world": "Styx"}, {"label": "ENCROACHMENT", "internal": "STYX_B_Extermination2", "category": "Confirmed", "tier": "Set B", "type": "Extermination", "world": "Styx"}, {"label": "IRONCLAD", "internal": "STYX_B_Research", "category": "Confirmed", "tier": "Set B", "type": "Research", "world": "Styx"}, {"label": "OPULENCE", "internal": "STYX_B_Stockpile", "category": "Confirmed", "tier": "Set B", "type": "Stockpile", "world": "Styx"}]}, {"title": "Set C", "entries": [{"label": "ALCAZAR", "internal": "STYX_C_Construction", "category": "Confirmed", "tier": "Set C", "type": "Construction", "world": "Styx"}, {"label": "RICOCHET", "internal": "STYX_C_Expedition", "category": "Confirmed", "tier": "Set C", "type": "Expedition", "world": "Styx"}, {"label": "KISMET", "internal": "STYX_C_Exploration", "category": "Confirmed", "tier": "Set C", "type": "Exploration", "world": "Styx"}, {"label": "BALLISTIC", "internal": "STYX_C_Extermination", "category": "Confirmed", "tier": "Set C", "type": "Extermination", "world": "Styx"}, {"label": "AUGMENTATION", "internal": "STYX_C_Extermination2", "category": "Confirmed", "tier": "Set C", "type": "Extermination", "world": "Styx"}]}, {"title": "Set D", "entries": [{"label": "RENDEZVOUS", "internal": "STYX_D_Delivery", "category": "Confirmed", "tier": "Set D", "type": "Delivery", "world": "Styx"}, {"label": "ZEPHYR", "internal": "STYX_D_Expedition", "category": "Confirmed", "tier": "Set D", "type": "Expedition", "world": "Styx"}, {"label": "CAVALCADE", "internal": "STYX_D_Exploration", "category": "Confirmed", "tier": "Set D", "type": "Exploration", "world": "Styx"}, {"label": "LUPINE", "internal": "STYX_D_Extermination", "category": "Confirmed", "tier": "Set D", "type": "Extermination", "world": "Styx"}, {"label": "GOSSAMER", "internal": "STYX_D_Research", "category": "Confirmed", "tier": "Set D", "type": "Research", "world": "Styx"}, {"label": "ABYSS", "internal": "STYX_D_Research_2", "category": "Confirmed", "tier": "Set D", "type": "Research", "world": "Styx"}]}, {"title": "Set E", "entries": [{"label": "VERTIGO", "internal": "STYX_E_Expedition", "category": "Confirmed", "tier": "Set E", "type": "Expedition", "world": "Styx"}, {"label": "DUST", "internal": "STYX_E_Exploration", "category": "Confirmed", "tier": "Set E", "type": "Exploration", "world": "Styx"}, {"label": "REMNANT", "internal": "STYX_E_Extraction", "category": "Confirmed", "tier": "Set E", "type": "Extraction", "world": "Styx"}, {"label": "FLATLINE", "internal": "STYX_E_Research", "category": "Confirmed", "tier": "Set E", "type": "Research", "world": "Styx"}, {"label": "CRESCENDO", "internal": "STYX_E_Survey", "category": "Confirmed", "tier": "Set E", "type": "Survey", "world": "Styx"}]}]}, "prometheus": {"section_title": "New Frontiers DLC - Prometheus", "notes": ["Internal names in the sections below are inferred and not confirmed. They may fail, behave differently, or not work with CreateProspect."], "groups": [{"title": "Open world", "entries": [{"label": "Prometheus open world", "internal": "OpenWorld_Prometheus", "category": "Confirmed", "tier": "Open world", "type": "Open world", "world": "Prometheus"}]}, {"title": "Story - not confirmed", "note": true, "entries": [{"label": "OFFENDER", "internal": "PRO_Story_1", "category": "Not confirmed", "tier": "Story", "type": "Story", "world": "Prometheus"}, {"label": "SHADOWED", "internal": "PRO_Story_2", "category": "Not confirmed", "tier": "Story", "type": "Story", "world": "Prometheus"}, {"label": "TEMPEST", "internal": "PRO_Story_3", "category": "Not confirmed", "tier": "Story", "type": "Story", "world": "Prometheus"}, {"label": "STRANDED", "internal": "PRO_Story_4", "category": "Not confirmed", "tier": "Story", "type": "Story", "world": "Prometheus"}, {"label": "RESCUE", "internal": "PRO_Story_5", "category": "Not confirmed", "tier": "Story", "type": "Story", "world": "Prometheus"}, {"label": "FRACTURE", "internal": "PRO_Story_6", "category": "Not confirmed", "tier": "Story", "type": "Story", "world": "Prometheus"}]}]}, "elysium": {"section_title": "Dangerous Horizons DLC - Elysium", "notes": ["Internal names in the sections below are inferred and not confirmed. They may fail, behave differently, or not work with CreateProspect."], "groups": [{"title": "Open world", "entries": [{"label": "Elysium open world", "internal": "OpenWorld_Elysium", "category": "Confirmed", "tier": "Open world", "type": "Open world", "world": "Elysium"}]}, {"title": "Story - not confirmed", "note": true, "entries": [{"label": "LOST", "internal": "ELY1", "category": "Not confirmed", "tier": "Story", "type": "Story", "world": "Elysium"}, {"label": "RELICS", "internal": "ELY2", "category": "Not confirmed", "tier": "Story", "type": "Story", "world": "Elysium"}, {"label": "NEXUS", "internal": "ELY3", "category": "Not confirmed", "tier": "Story", "type": "Story", "world": "Elysium"}, {"label": "FALLOUT", "internal": "ELY4", "category": "Not confirmed", "tier": "Story", "type": "Story", "world": "Elysium"}, {"label": "RIFT", "internal": "ELY5", "category": "Not confirmed", "tier": "Story", "type": "Story", "world": "Elysium"}, {"label": "RECKONING", "internal": "ELY6", "category": "Not confirmed", "tier": "Story", "type": "Story", "world": "Elysium"}]}, {"title": "Side missions - not confirmed", "note": true, "entries": [{"label": "IGLOO", "internal": "SQ_Igloo", "category": "Not confirmed", "tier": "Side", "type": "Side", "world": "Elysium"}, {"label": "EVOLUTION", "internal": "SQ_Yeti", "category": "Not confirmed", "tier": "Side", "type": "Side", "world": "Elysium"}, {"label": "FISHERIES OFFICER", "internal": "SQ_Fish", "category": "Not confirmed", "tier": "Side", "type": "Side", "world": "Elysium"}, {"label": "PREDATOR SPECIALIST", "internal": "SQ_Hunter", "category": "Not confirmed", "tier": "Side", "type": "Side", "world": "Elysium"}]}]}, "outposts": {"section_title": "Outposts", "notes": [], "groups": [{"title": "Available", "entries": [{"label": "ARCWOOD", "internal": "Outpost002_Forest", "category": "Confirmed", "tier": "Outpost", "type": "Outpost", "world": "Outposts"}, {"label": "ICEHOLM", "internal": "Outpost003_Arctic", "category": "Confirmed", "tier": "Outpost", "type": "Outpost", "world": "Outposts"}, {"label": "HOLDFAST", "internal": "Outpost005_Forest", "category": "Confirmed", "tier": "Outpost", "type": "Outpost", "world": "Outposts"}, {"label": "Olympus outpost", "internal": "Outpost006_Olympus", "category": "Confirmed", "tier": "Outpost", "type": "Outpost", "world": "Outposts"}]}]}};
+
+let selected = null;
+let selectedLabel = '';
+let selectedEntry = null;
+let allButtons = [];
+let allTierGroups = [];
+const activeTierFilters = new Set();
+const activeTypeFilters = new Set();
+
+function escapeHtml(value) {
+  return value.replace(/[&<>"']/g, function(m) {
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];
+  });
+}
+
+function renderWorldSections() {
+  const container = document.getElementById('world-sections');
+  container.innerHTML = '';
+
+  Object.entries(maps).forEach(([worldKey, world]) => {
+    const section = document.createElement('div');
+    section.className = 'section world-section';
+    section.id = 'section-' + worldKey;
+
+    const title = document.createElement('div');
+    title.className = 'section-title';
+    title.textContent = world.section_title;
+    section.appendChild(title);
+
+    const block = document.createElement('div');
+    block.className = 'world-block';
+    block.id = 'btn-' + worldKey;
+
+    let noteInjected = false;
+    world.groups.forEach((group) => {
+      if (group.note && !noteInjected && world.notes.length) {
+        const note = document.createElement('div');
+        note.className = 'world-note';
+        note.textContent = world.notes[0];
+        block.appendChild(note);
+        noteInjected = true;
+      }
+      block.appendChild(createTierGroup(group, worldKey));
+    });
+
+    section.appendChild(block);
+    container.appendChild(section);
+  });
+}
+
+function createTierGroup(group, worldKey) {
+  const wrap = document.createElement('div');
+  wrap.className = 'tier-group';
+  wrap.dataset.world = worldKey;
+  wrap.dataset.title = group.title.toLowerCase();
+  wrap.dataset.noteGroup = group.note ? 'true' : 'false';
+  if (group.note) wrap.dataset.notConfirmed = 'true';
+
+  const header = document.createElement('button');
+  header.type = 'button';
+  header.className = 'tier-header';
+  header.setAttribute('aria-expanded', 'true');
+  header.innerHTML = `
+    <span class="tier-left">
+      <span class="tier-name">${escapeHtml(group.title)}</span>
+      <span class="tier-count">${group.entries.length} entries</span>
+    </span>
+    <span class="tier-caret">▾</span>
+  `;
+  header.addEventListener('click', () => {
+    wrap.classList.toggle('collapsed');
+    header.setAttribute('aria-expanded', String(!wrap.classList.contains('collapsed')));
+  });
+
+  const content = document.createElement('div');
+  content.className = 'tier-content';
+
+  group.entries.forEach((entry) => {
+    const btn = document.createElement('button');
+    btn.className = 'map-btn';
+    btn.type = 'button';
+    btn.dataset.internal = entry.internal;
+    btn.dataset.label = entry.label.toLowerCase();
+    btn.dataset.category = entry.category.toLowerCase();
+    btn.dataset.tier = entry.tier.toLowerCase();
+    btn.dataset.type = entry.type.toLowerCase();
+    btn.dataset.group = group.title.toLowerCase();
+    btn.dataset.world = worldKey.toLowerCase();
+
+    btn.innerHTML = `
+      <span class="map-btn-inner">
+        <span class="map-btn-title">${escapeHtml(entry.label)}</span>
+        <span class="badges">
+          <span class="badge tier">${escapeHtml(entry.tier)}</span>
+          <span class="badge type">${escapeHtml(entry.type)}</span>
+          <span class="badge status ${entry.category.toLowerCase().replace(/\s+/g, '-')}">${escapeHtml(entry.category)}</span>
+        </span>
+      </span>
+    `;
+    btn.addEventListener('click', () => selectMap(entry, btn));
+    content.appendChild(btn);
+    allButtons.push(btn);
+  });
+
+  wrap.appendChild(header);
+  wrap.appendChild(content);
+  allTierGroups.push(wrap);
+  return wrap;
+}
+
+function collectFilterValues() {
+  const tiers = new Set();
+  const types = new Set();
+
+  Object.values(maps).forEach(world => {
+    world.groups.forEach(group => {
+      group.entries.forEach(entry => {
+        if (entry.tier && !['open world','set a','set b','set c','set d','set e','story','side','outpost'].includes(entry.tier.toLowerCase())) {
+          tiers.add(entry.tier);
+        }
+        if (entry.type && !['open world','outpost'].includes(entry.type.toLowerCase())) {
+          types.add(entry.type);
+        }
+      });
+    });
+  });
+
+  return {
+    tiers: ['T1','T2','T3','T4','T5'].filter(t => tiers.has(t)),
+    types: Array.from(types).sort((a,b) => a.localeCompare(b))
+  };
+}
+
+function renderFilterChips() {
+  const values = collectFilterValues();
+  const tierWrap = document.getElementById('tier-filters');
+  const typeWrap = document.getElementById('type-filters');
+  tierWrap.innerHTML = '';
+  typeWrap.innerHTML = '';
+
+  values.tiers.forEach(tier => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'chip';
+    chip.textContent = tier;
+    chip.dataset.value = tier.toLowerCase();
+    chip.addEventListener('click', () => {
+      toggleFilter(activeTierFilters, tier.toLowerCase(), chip);
+      applyFilters();
+    });
+    tierWrap.appendChild(chip);
+  });
+
+  values.types.forEach(type => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'chip';
+    chip.textContent = type;
+    chip.dataset.value = type.toLowerCase();
+    chip.addEventListener('click', () => {
+      toggleFilter(activeTypeFilters, type.toLowerCase(), chip);
+      applyFilters();
+    });
+    typeWrap.appendChild(chip);
+  });
+}
+
+function toggleFilter(setRef, value, chip) {
+  if (setRef.has(value)) {
+    setRef.delete(value);
+    chip.classList.remove('active');
+  } else {
+    setRef.add(value);
+    chip.classList.add('active');
+  }
+}
+
+function difficultyLabel(value) {
+  return {
+    '1': 'Easy',
+    '2': 'Normal',
+    '3': 'Hard',
+    '4': 'Extreme'
+  }[value] || value;
+}
+
+function todayIso() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function applyTemplate(entry) {
+  const template = document.getElementById('name-template').value.trim() || "Loppy's Colony on {prospect}";
+  const diffValue = document.getElementById('difficulty').value;
+  const replacements = {
+    '{prospect}': entry ? entry.label : 'PICKED_PROSPECT',
+    '{internal}': entry ? entry.internal : 'PICKED_INTERNAL',
+    '{difficulty}': difficultyLabel(diffValue),
+    '{world}': entry ? entry.world : 'PICKED_WORLD',
+    '{type}': entry ? entry.type : 'PICKED_TYPE',
+    '{tier}': entry ? entry.tier : 'PICKED_TIER',
+    '{date}': todayIso()
+  };
+  let out = template;
+  Object.entries(replacements).forEach(([token, value]) => {
+    out = out.split(token).join(value);
+  });
+  return out;
+}
+
+function syncPlaceholder() {
+  document.getElementById('savename').placeholder = applyTemplate(selectedEntry);
+}
+
+function selectMap(map, btn) {
+  document.querySelectorAll('.map-btn').forEach((b) => b.classList.remove('active'));
+  btn.classList.add('active');
+  selected = map.internal;
+  selectedLabel = map.label;
+  selectedEntry = map;
+  document.getElementById('selected-label').textContent = map.label;
+  document.getElementById('selected-internal').textContent = map.internal;
+  document.getElementById('selected-meta').textContent = `${map.world} / ${map.tier} / ${map.type}`;
+  syncPlaceholder();
+  update();
+}
+
+function update() {
+  if (!selectedEntry) {
+    document.getElementById('rcon-out').innerHTML = '<span class="empty">Select a map above</span>';
+    return;
+  }
+  const saveInput = document.getElementById('savename');
+  const saveName = saveInput.value.trim() || applyTemplate(selectedEntry);
+  const diff = document.getElementById('difficulty').value;
+  const omitSaveName = document.getElementById('omit-savename').checked;
+
+  let rcon = `CreateProspect ${selectedEntry.internal} ${diff} false`;
+  if (!omitSaveName) {
+    const escapedSaveName = saveName.replace(/"/g, '\"');
+    rcon += ` "${escapedSaveName}"`;
+  }
+
+  document.getElementById('rcon-out').textContent = rcon;
+  syncPlaceholder();
+}
+
+function showCopiedState(btn, idleText, copiedText = 'Copied') {
+  const previous = btn.dataset.previousText || idleText || btn.textContent;
+  btn.dataset.previousText = previous;
+  btn.textContent = copiedText;
+  btn.classList.add('copied');
+  setTimeout(() => {
+    btn.textContent = previous;
+    btn.classList.remove('copied');
+  }, 1400);
+}
+
+function copyInline(btn, text) {
+  navigator.clipboard.writeText(text).then(() => {
+    showCopiedState(btn, btn.textContent, 'Copied');
+  }).catch(() => {
+    btn.textContent = 'Failed';
+    setTimeout(() => { btn.textContent = btn.dataset.previousText || 'Copy'; }, 1400);
+  });
+}
+
+function copyText(id, btn) {
+  const el = document.getElementById(id);
+  const text = el.innerText.trim();
+  if (!text || text === 'Select a map above') return;
+  navigator.clipboard.writeText(text).then(() => {
+    showCopiedState(btn, btn.textContent, 'Copied');
+  }).catch(() => {
+    const fallback = btn.textContent;
+    btn.textContent = 'Failed';
+    setTimeout(() => { btn.textContent = fallback; }, 1400);
+  });
+}
+
+function copyInternal(btn) {
+  if (!selectedEntry) return;
+  navigator.clipboard.writeText(selectedEntry.internal).then(() => {
+    showCopiedState(btn, btn.textContent, 'Copied');
+  }).catch(() => {
+    const fallback = btn.textContent;
+    btn.textContent = 'Failed';
+    setTimeout(() => { btn.textContent = fallback; }, 1400);
+  });
+}
+
+function expandGroup(groupEl) {
+  groupEl.classList.remove('collapsed');
+  const header = groupEl.querySelector('.tier-header');
+  if (header) header.setAttribute('aria-expanded', 'true');
+}
+
+function collapseGroup(groupEl) {
+  groupEl.classList.add('collapsed');
+  const header = groupEl.querySelector('.tier-header');
+  if (header) header.setAttribute('aria-expanded', 'false');
+}
+
+function expandAll() {
+  allTierGroups.forEach(expandGroup);
+}
+
+function collapseAll() {
+  allTierGroups.forEach((groupEl) => {
+    const world = groupEl.dataset.world;
+    const title = groupEl.dataset.title;
+    if (title === 'open world' || world === 'outposts') {
+      expandGroup(groupEl);
+    } else {
+      collapseGroup(groupEl);
+    }
+  });
+}
+
+function buttonMatchesFilters(btn) {
+  const tierOk = activeTierFilters.size === 0 || activeTierFilters.has(btn.dataset.tier);
+  const typeOk = activeTypeFilters.size === 0 || activeTypeFilters.has(btn.dataset.type);
+  return tierOk && typeOk;
+}
+
+function applyFilters() {
+  const term = document.getElementById('search').value.trim().toLowerCase();
+
+  allButtons.forEach((btn) => {
+    const haystack = `${btn.dataset.label} ${btn.dataset.internal.toLowerCase()} ${btn.dataset.world} ${btn.dataset.tier} ${btn.dataset.type} ${btn.dataset.group} ${btn.dataset.category}`;
+    const matchesSearch = !term || haystack.includes(term);
+    const matchesToggles = buttonMatchesFilters(btn);
+    btn.hidden = !(matchesSearch && matchesToggles);
+  });
+
+  allTierGroups.forEach((group) => {
+    const buttons = [...group.querySelectorAll('.map-btn')];
+    const hasVisible = buttons.some(btn => !btn.hidden);
+    group.hidden = !hasVisible;
+    if (term && hasVisible) {
+      expandGroup(group);
+    }
+  });
+
+  document.querySelectorAll('.world-section').forEach((section) => {
+    const visibleGroups = [...section.querySelectorAll('.tier-group')].some(group => !group.hidden);
+    section.hidden = !visibleGroups;
+  });
+
+  document.querySelectorAll('.world-block').forEach((block) => {
+    const note = block.querySelector('.world-note');
+    if (!note) return;
+    const visibleNotConfirmed = [...block.querySelectorAll('.tier-group[data-not-confirmed="true"]')].some(group => !group.hidden);
+    note.hidden = !visibleNotConfirmed;
+  });
+
+  updateVisibleCount();
+}
+
+function updateVisibleCount() {
+  const count = allButtons.filter(btn => !btn.hidden).length;
+  document.getElementById('visible-count').textContent = count;
+}
+
+function clearSearch() {
+  document.getElementById('search').value = '';
+  applyFilters();
+}
+
+renderWorldSections();
+renderFilterChips();
+collapseAll();
+updateVisibleCount();
+syncPlaceholder();
+
+document.getElementById('savename').addEventListener('input', update);
+document.getElementById('name-template').addEventListener('input', () => { syncPlaceholder(); update(); });
+document.getElementById('difficulty').addEventListener('input', update);
+document.getElementById('difficulty').addEventListener('change', update);
+document.getElementById('omit-savename').addEventListener('change', update);
+document.getElementById('search').addEventListener('input', applyFilters);
+</script>
+</body>
+</html>
